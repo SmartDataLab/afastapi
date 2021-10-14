@@ -24,7 +24,21 @@ MAX_REQUEST = 5
 global REQUEST_COUNT
 REQUEST_COUNT = 0
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI()
+
+origins = [
+    "*",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/")
@@ -89,9 +103,9 @@ async def upload(
         if not existName:
             fileName = generateName(type == "pre")
         elif type == "pre":
-            fileName = existName.replace("_post", "_pre")
+            fileName = existName + "_pre.png"
         elif type == "post":
-            fileName = existName.replace("_pre", "_post")
+            fileName = existName + "_post.png"
 
         print(fileName)
         contents = await myFile.read()
@@ -130,6 +144,8 @@ def _read_image_as_array(path, dtype):
             f.close()
     return image
 
+
+ABS_PATH = "/data1/su/pdd/afastapi/"
 
 # api 5 done
 @app.get("/cls_for_upload")

@@ -92,6 +92,17 @@ def run2(img_path_pre, img_path_post):  # img_pre_path, img_post_path
         ),
     )
 
+def sizefix(img_path_pre, img_path_post):
+
+    img_pre = Image.open(img_path_pre)
+    img_post = Image.open(img_path_post)
+    base_img_pre = Image.new('RGB', (1024, 1024), (0, 0, 0))
+    base_img_post = Image.new('RGB', (1024, 1024), (0, 0, 0))
+    base_img_pre.paste(img_pre, (0, 0)+img_pre.size)
+    base_img_post.paste(img_post, (0, 0)+img_post.size)
+    base_img_pre.save("/data1/su/pdd/afastapi/img_pre_fixed.png")
+    base_img_post.save("/data1/su/pdd/afastapi/img_post_fixed.png")
+
 
 import time
 
@@ -101,10 +112,15 @@ if __name__ == "__main__":
     # img = "/data1/pdd/test/img/1_pre_.png"
     # img = "/data1/pdd/test/img/1_post_.png"
     # run(img)
-    img = "/data1/su/pdd/afastapi/input/3_pre.png"
+    
+    img = "/data1/su/pdd/afastapi/userid_tmp_819_pre.png"  # 819
+    img2 = "/data1/su/pdd/afastapi/userid_tmp_819_post.png"
+    img_pre_fixed = "/data1/su/pdd/afastapi/img_pre_fixed.png"
+    img_post_fixed = "/data1/su/pdd/afastapi/img_post_fixed.png"
+    sizefix(img, img2)
     # img = "test/images/socal-fire_00001384_pre_disaster.png"
-    for i in range(10):
-        run(img)
-    t1 = time.time()
+    # for i in range(10):
+    run2(img_pre_fixed, img_post_fixed)
+    # t1 = time.time()
 
-    print((t1 - t0) / 10)
+    # print((t1 - t0) / 10)
