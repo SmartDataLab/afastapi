@@ -147,6 +147,21 @@ def _read_image_as_array(path, dtype):
 
 ABS_PATH = "/data1/su/pdd/afastapi/"
 
+
+def sizefix(img_path_pre: str, img_path_post: str):
+
+    img_pre = Image.open(img_path_pre)
+    img_post = Image.open(img_path_post)
+
+    base_img_pre = Image.new("RGB", (1024, 1024), (0, 0, 0))
+    base_img_post = Image.new("RGB", (1024, 1024), (0, 0, 0))
+    base_img_pre.paste(img_pre, (0, 0) + img_pre.size)
+    base_img_post.paste(img_post, (0, 0) + img_post.size)
+    base_img_pre.save(img_path_pre.replace("pre", "pre_fixed"))
+    base_img_post.save(img_path_post.replace("post", "post_fixed"))
+    return img_pre.size[0],img_pre.size[1]
+
+
 # api 5 done
 @app.get("/cls_for_upload")
 async def cls_for_upload(pre_file_name: str, post_file_name: str, request: Request):
@@ -160,8 +175,14 @@ async def cls_for_upload(pre_file_name: str, post_file_name: str, request: Reque
                 and pre_file_name.split(".")[-1] in ["png", "jpg"]
                 and post_file_name.split(".")[-1] in ["png", "jpg"]
             ):
-                img_pre = _read_image_as_array(pre_file_name, np.float32)
-                img_post = _read_image_as_array(post_file_name, np.float32)
+                # fixed_size
+                height,width = sizefix(pre_file_name, post_file_name)
+                img_pre = _read_image_as_array(
+                    pre_file_name.replace("pre", "pre_fixed"), np.float32
+                )
+                img_post = _read_image_as_array(
+                    post_file_name.replace("post", "post_fixed"), np.float32
+                )
 
                 if (
                     img_pre.shape[0] == img_post.shape[0]
@@ -170,27 +191,37 @@ async def cls_for_upload(pre_file_name: str, post_file_name: str, request: Reque
                     and pre_file_name.split(".")[-1] == post_file_name.split(".")[-1]
                 ):
 
-                    grpc_client.run2(pre_file_name, post_file_name)
+                    grpc_client.run2(
+                        pre_file_name.replace("pre", "pre_fixed"),
+                        post_file_name.replace("post", "post_fixed"), height = height, width = width
+                    )
                     if os.path.exists(
-                        pre_file_name.split(".")[0].replace("_pre", "_result") + ".png"
+                        pre_file_name.replace("pre", "pre_fixed")
+                        .split(".")[0]
+                        .replace("_pre", "_result")
+                        + ".png"
                     ):
                         img = getByte(
-                            pre_file_name.split(".")[0].replace("_pre", "_result")
+                            pre_file_name.replace("pre", "pre_fixed")
+                            .split(".")[0]
+                            .replace("_pre", "_result")
                             + ".png"
                         )
                         return {
                             "success": "true",
-                            "fileName": pre_file_name.replace("pre", "result"),
+                            "fileName": pre_file_name.replace(
+                                "pre", "pre_fixed"
+                            ).replace("pre", "result"),
                             "img": img,
                         }
                     else:
                         raise HTTPException(
-                            status_code=102,
+                            status_code=518,
                             detail="fail to generate result.",
                         )
                 else:
                     raise HTTPException(
-                        status_code=102,
+                        status_code=218,
                         detail="pre_img and post_img's width or height or channel or picture format are not the same.",
                     )
             else:
