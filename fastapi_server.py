@@ -147,6 +147,54 @@ def _read_image_as_array(path, dtype):
 
 ABS_PATH = "/data1/su/pdd/afastapi/"
 
+import numpy as np
+from scipy.ndimage import zoom
+
+
+def clipped_zoom(img, zoom_factor, **kwargs):
+
+    h, w = img.shape[:2]
+
+    # For multichannel images we don't want to apply the zoom factor to the RGB
+    # dimension, so instead we create a tuple of zoom factors, one per array
+    # dimension, with 1's for any trailing dimensions after the width and height.
+    zoom_tuple = (zoom_factor,) * 2 + (1,) * (img.ndim - 2)
+
+    # Zooming out
+    if zoom_factor < 1:
+
+        # Bounding box of the zoomed-out image within the output array
+        zh = int(np.round(h * zoom_factor))
+        zw = int(np.round(w * zoom_factor))
+        top = (h - zh) // 2
+        left = (w - zw) // 2
+
+        # Zero-padding
+        out = np.zeros_like(img)
+        out[top : top + zh, left : left + zw] = zoom(img, zoom_tuple, **kwargs)
+
+    # Zooming in
+    elif zoom_factor > 1:
+
+        # Bounding box of the zoomed-in region within the input array
+        zh = int(np.round(h / zoom_factor))
+        zw = int(np.round(w / zoom_factor))
+        top = (h - zh) // 2
+        left = (w - zw) // 2
+
+        out = zoom(img[top : top + zh, left : left + zw], zoom_tuple, **kwargs)
+
+        # `out` might still be slightly larger than `img` due to rounding, so
+        # trim off any extra pixels at the edges
+        trim_top = (out.shape[0] - h) // 2
+        trim_left = (out.shape[1] - w) // 2
+        out = out[trim_top : trim_top + h, trim_left : trim_left + w]
+
+    # If zoom_factor == 1, just return the input array
+    else:
+        out = img
+    return out
+
 
 def sizefix(img_path_pre: str, img_path_post: str):
 
@@ -155,11 +203,20 @@ def sizefix(img_path_pre: str, img_path_post: str):
 
     base_img_pre = Image.new("RGB", (1024, 1024), (0, 0, 0))
     base_img_post = Image.new("RGB", (1024, 1024), (0, 0, 0))
-    base_img_pre.paste(img_pre, (0, 0) + img_pre.size)
-    base_img_post.paste(img_post, (0, 0) + img_post.size)
+    if img_pre.size[0] <= 1024 and img_pre.size[1]:
+        base_img_pre.paste(img_pre, (0, 0) + img_pre.size)
+        base_img_post.paste(img_post, (0, 0) + img_post.size)
+    else:
+        img_pre_np = np.array(img_pre)
+        img_post_np = np.array(img_post)
+        zoom_ratio = 1024 / max(img_pre.size)
+        img_pre = Image.fromarray(clipped_zoom(img_pre_np, zoom_ratio))
+        img_post = Image.fromarray(clipped_zoom(img_post_np, zoom_ratio))
+        base_img_pre.paste(img_pre, (0, 0) + img_pre.size)
+        base_img_post.paste(img_post, (0, 0) + img_post.size)
     base_img_pre.save(img_path_pre.replace("pre", "pre_fixed"))
     base_img_post.save(img_path_post.replace("post", "post_fixed"))
-    return img_pre.size[0],img_pre.size[1]
+    return img_pre.size[0], img_pre.size[1]
 
 
 # api 5 done
@@ -176,7 +233,7 @@ async def cls_for_upload(pre_file_name: str, post_file_name: str, request: Reque
                 and post_file_name.split(".")[-1] in ["png", "jpg"]
             ):
                 # fixed_size
-                height,width = sizefix(pre_file_name, post_file_name)
+                width, height = sizefix(pre_file_name, post_file_name)
                 img_pre = _read_image_as_array(
                     pre_file_name.replace("pre", "pre_fixed"), np.float32
                 )
@@ -193,7 +250,9 @@ async def cls_for_upload(pre_file_name: str, post_file_name: str, request: Reque
 
                     grpc_client.run2(
                         pre_file_name.replace("pre", "pre_fixed"),
-                        post_file_name.replace("post", "post_fixed"), height = height, width = width
+                        post_file_name.replace("post", "post_fixed"),
+                        height=height,
+                        width=width,
                     )
                     if os.path.exists(
                         pre_file_name.replace("pre", "pre_fixed")
